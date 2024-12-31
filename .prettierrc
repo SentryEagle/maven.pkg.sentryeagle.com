@@ -1,0 +1,4 @@
+{
+  "tailwindFunctions": ["classNames"],
+  "plugins": ["prettier-plugin-tailwindcss"]
+}

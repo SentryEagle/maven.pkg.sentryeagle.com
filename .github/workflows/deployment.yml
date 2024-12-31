@@ -1,0 +1,57 @@
+name: "Deployment"
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["main"]
+
+permissions:
+  contents: "read"
+
+jobs:
+  deployment:
+    runs-on: "ubuntu-latest"
+
+    steps:
+      - name: "github actions: checkout repository"
+        uses: "actions/checkout@v4"
+
+      - name: "github actions: setup nodejs"
+        id: "node"
+        uses: "actions/setup-node@v4"
+        with:
+          node-version: "latest"
+          cache: "npm"
+
+      - name: "github actions: cache dependencies"
+        id: cache
+        uses: "actions/cache@v4"
+        with:
+          path: "./node_modules"
+          key: "${{ runner.os }}-node-${{ steps.node.outputs.node-version }}-modules-${{ hashFiles('package-lock.json') }}"
+
+      - name: "npm: install dependencies"
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: "npm ci"
+
+      - name: "npm: build project"
+        run: "npm run build"
+
+      - name: "apt: install dependencies"
+        run: |
+          sudo apt-get -y install \
+            lftp
+
+      - name: "lftp: deploy"
+        run: |
+          lftp -u ${{ secrets.FTP_USER }},${{ secrets.FTP_PASSWORD }} ${{ secrets.FTP_HOST }} \
+            -e "set ftp:ssl-force yes; \
+                mirror \
+                --delete \
+                --reverse \
+                --no-symlinks \
+                --no-umask \
+                --verbose \
+                --parallel=10 \
+                --exclude .m2 \
+                out /; bye"
